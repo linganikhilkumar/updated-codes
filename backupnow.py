@@ -2,32 +2,23 @@ import boto3
 import datetime
 import sys
 from datetime import date
-from pytz import timezone
-import pytz
 from dateutil.tz import *
 # variables
 backup_tag = 'AMI_Backup_Policy'
+now = datetime.datetime.now(gettz("US/Eastern")) 
+dest_date=now.strftime("%Y-%m-%d")
+current_dest_time=now.strftime("%H:%M")
 
-#current_dest_time = '03:00'
-# current time
 client = boto3.client('ec2')
 dynamodb = boto3.client('dynamodb')
 def create_ami(inst):
-	amiresponse = client.create_image(InstanceId=inst, Name= inst+'-'+date.today())
-        client.create_tags(Resources=[amiresponse['ImageId'],],Tags=[{'Key': 'Auto-Backup','Value': 'yes',},],)
+	amiresponse = client.create_image(InstanceId=inst, Name= inst+'-'+dest_date)
+        client.create_tags(Resources=[amiresponse['ImageId'],],Tags=[{'Key': 'Name','Value': inst+'-'+dest_date },{'Key': 'Auto-Backup','Value': 'yes'},{'Key': backup_tag ,'Value': bvalue.split('-')[1] }],)
         dynamodb.put_item(TableName = 'ami_backup_policy',Item={'ami_ids' :{'S': amiresponse['ImageId'],}})
 
 def lambda_handler(event, keys):
-    current_local_time = tzlocal()
-    now = datetime.datetime.now()   
-    now = now.replace(tzinfo = current_local_time) 
- #   time_now = create_time.strftime("%H:%M")
- #    print now
-    ty = pytz.timezone('US/Eastern')
-    current_dest_time = now.astimezone(ty)
-    print current_dest_time
+    
    
-  
     response = client.describe_instances(Filters=[{'Name': 'tag-key', 'Values':[backup_tag]}])
 # print response
     for reservation in response['Reservations']:
@@ -35,5 +26,11 @@ def lambda_handler(event, keys):
             for j in  n['Tags']:
                 if j['Key'] == backup_tag:
                 	bvalue =  j['Value']
-                	if current_dest_time == bvalue.split('-')[0]:
-                		create_ami(n['InstanceId']);               		
+                	#if current_dest_time  == bvalue.split('-')[0] :
+                	x = bvalue.split('-')[0][0:bvalue.split('-')[0].find(':')]
+                	timeValList = []
+                	for i in range(0,6):
+                            timeValList.append(x + ":0" + str(i))
+                	if current_dest_time in timeValList:
+                		create_ami(n['InstanceId']);
+               
